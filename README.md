@@ -8,6 +8,7 @@ A sparse matrix computation crate. This is early days of a practice project.
 - Generic scalar support (to be decided : f32, f64, complex, dense matrices...)
 - Support for seemless Symbolic computations --- little symbolic-specific code (using the SymbolicScalar)
 - Inspired by Tim Davis's "Direct Methodes for Sparse linear systems"
+- Data compatibility with other CSC crates or C/C++ libs.
 
 # Performance
 
@@ -22,5 +23,5 @@ Execution is deterministic. (This might become a challenging requirement with GP
 These are subject to discussions
 
 - Support for many representations : the core representation of the matrix should be CSC. Other reprensentations (COO...) may be introduced for construction of the matrices, but with little to no linear algebra support.
-
+- Ultra-generic storage. Crates like `nalgebra` can use many kind of storage. `spare` will keep it simple and support owned, contiguous storage (Vec<> for now).
 
