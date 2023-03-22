@@ -3,7 +3,7 @@ use rand::distributions::Distribution;
 use rand::distributions::Uniform;
 use sparse::prelude::*;
 
-fn make_random(m: usize, n: usize, k: usize) -> CoordsMatrix<f32, u32> {
+fn make_random(m: u32, n: u32, k: u32) -> CoordsMatrix<f32, u32> {
     let mut rng = rand::thread_rng();
     let mx = Uniform::from(1..m);
     let nx = Uniform::from(1..n);
@@ -13,7 +13,7 @@ fn make_random(m: usize, n: usize, k: usize) -> CoordsMatrix<f32, u32> {
     let j = (0..k).map(|_| nx.sample(&mut rng)).collect();
     let x = (0..k).map(|_| kx.sample(&mut rng)).collect();
 
-    CoordsMatrix { i, j, x };
+    CoordsMatrix { i, j, x }
 }
 
 pub fn sparse_create(c: &mut Criterion) {

@@ -1,3 +1,4 @@
+/*
 use crate::prelude::*;
 
 impl<ScalarT, SizeT> std::ops::Mul<&Self> for SMatrix<ScalarT, SizeT>
@@ -45,4 +46,5 @@ where
         }
     }
 }
+*/
 */

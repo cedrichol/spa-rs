@@ -1,27 +1,34 @@
-
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Storage<Scalar> {
-	pub values: Vec<Scalar>
+pub struct IdxStorage<Contained>
+where
+    Contained: Copy + TryFrom<usize> + TryInto<usize>,
+{
+    pub values: Vec<Contained>,
 }
 
-impl<Scalar, Idx> Index<Idx> for Balance {
-    type Output = Scalar;
-
-    fn index(&self, index: Idx) -> &Self::Output {
-    	&self.values[load(index)]
+impl<Contained> IdxStorage<Contained>
+where
+    Contained: Copy + TryFrom<usize> + TryInto<usize>,
+{
+    pub fn from(vec: Vec<Contained>) -> Self {
+        Self { values: vec }
+    }
+    pub fn len(&self) -> usize {
+    	self.values.len()
+    }
+    pub fn is_empty(&self) -> bool {
+    	self.len() == 0
+    }
+    pub fn get(&self, i: usize) -> usize {
+        load(self.values[i])
+    }
+    pub fn set(&mut self, i: usize, val: usize) {
+        self.values[i] = Self::to_contained(val);
+    }
+    pub fn to_contained(val: usize) -> Contained {
+    	store(val)
     }
 }
-
-impl<Scalar, Idx> IndexMut<Idx> for Balance {
-    fn index_mut(&mut self, index: Idx) -> &mut Self::Output {
-    	&mut self.values[load(index)]
-    }
-}
-
-
-
-
-
 
 fn load<SizeT>(x: SizeT) -> usize
 where

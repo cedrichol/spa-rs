@@ -1,11 +1,17 @@
 #![allow(non_snake_case)]
 
+use crate::prelude::*;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SMatrix<ScalarT, SizeT = usize> {
-    m: SizeT,
-    n: SizeT,
-    p: Vec<SizeT>,
-    i: Vec<SizeT>,
+pub struct SMatrix<ScalarT, SizeT = usize>
+where
+    ScalarT: Clone + Default,
+    SizeT: Copy + TryFrom<usize> + TryInto<usize>,
+{
+    m: usize,
+    n: usize,
+    p: IdxStorage<SizeT>,
+    i: IdxStorage<SizeT>,
     x: Vec<ScalarT>,
 }
 
@@ -26,34 +32,6 @@ impl std::ops::Add<SymbolicScalar> for SymbolicScalar {
     }
 }
 
-fn load<SizeT>(x: SizeT) -> usize
-where
-    SizeT: TryFrom<usize> + TryInto<usize>,
-{
-    let handle = |_| {
-        if cfg!(debug_assertions) {
-            panic!("Your usize is too small to fit the data in SizeT")
-        } else {
-            unsafe { std::hint::unreachable_unchecked() }
-        }
-    };
-    x.try_into().unwrap_or_else(handle)
-}
-
-fn store<SizeT>(x: usize) -> SizeT
-where
-    SizeT: TryFrom<usize> + TryInto<usize>,
-{
-    let handle = |_| {
-        if cfg!(debug_assertions) {
-            panic!("Your SizeT is too small to fit the data in usize: x={x}")
-        } else {
-            unsafe { std::hint::unreachable_unchecked() }
-        }
-    };
-    x.try_into().unwrap_or_else(handle)
-}
-
 // SizeT must be big enough to either hold N, M, or nnz.
 // For instance a 200*200 matrix with 260 entries cannot be represented with u8
 
@@ -62,9 +40,8 @@ where
     ScalarT: Clone + Default,
     SizeT: Copy + TryFrom<usize> + TryInto<usize>,
 {
-
     pub fn get_shape(&self) -> (usize, usize) {
-        (load(self.m), load(self.n))
+        (self.m, self.n)
     }
 
     pub fn get_x(&self) -> &[ScalarT] {
@@ -88,43 +65,43 @@ where
 
         let nnz = Ai.len();
         let (M, N) = shape;
-        let mut Bp = vec![store(0); N + 1];
-        let mut Bi = vec![store(0); nnz]; // maybe they can be uninit ?
+        let mut Bp = IdxStorage::from(vec![IdxStorage::to_contained(0); N + 1]);
+        let mut Bi = IdxStorage::from(vec![IdxStorage::to_contained(0); nnz]); // maybe they can be uninit ?
         let mut Bx = vec![ScalarT::default(); nnz]; // idem (even worse)
 
         // make p: the cumulative sum of indices of each column
         for j in Aj {
-            let j = load(*j);
-            Bp[j] = store(1 + load(Bp[j]));
+            let j = (*j).try_into().unwrap_or_else(|_| panic!("Aj[k] doesn't fit in SizeT"));
+            Bp.set(j, 1 + Bp.get(j));
         }
 
         let mut cumsum = 0;
         #[allow(clippy::needless_range_loop)]
         for j in 0..N {
-            let temp = load(Bp[j]);
-            Bp[j] = store(cumsum);
+            let temp = Bp.get(j);
+            Bp.set(j, cumsum);
             cumsum += temp;
         }
 
         // make	new i,x from the given COOs
         // uses p as as the global index
         for k in 0..nnz {
-            let j = load(Aj[k]);
-            let global_i = load(Bp[j]);
-            Bp[j] = store(load(Bp[j]) + 1);
-            Bi[global_i] = Ai[k];
+            let j = Aj[k].try_into().unwrap_or_else(|_| panic!("Aj[k] doesn't fit in SizeT"));
+            let global_i = Bp.get(j);
+            Bp.set(j, 1 + Bp.get(j));
+            Bi.values[global_i] = Ai[k];
             Bx[global_i] = Ax[k].clone();
         }
 
         // at the end p has to be shifted to be restored
-        Bp.pop()
+        Bp.values.pop()
             .unwrap_or_else(|| panic!("That should be impossible : N + 1 > 0"));
-        Bp.insert(0, store(0));
+        Bp.values.insert(0, IdxStorage::to_contained(0));
 
         // CSR representation (possible duplicates, unsorted column)
         Self {
-            m: store(M),
-            n: store(N),
+            m: M,
+            n: N,
             p: Bp,
             i: Bi,
             x: Bx,
@@ -132,29 +109,29 @@ where
     }
 
     pub fn dedup_by(mut self, reduce: impl Fn(ScalarT, ScalarT) -> ScalarT) -> Self {
-        let mut last_seen_at = vec![store::<SizeT>(0); load(self.m)];
+        let mut last_seen_at = IdxStorage::from(vec![IdxStorage::<SizeT>::to_contained(0); self.m]);
         let mut writeidx = 0;
         for col in 0..self.p.len() - 1 {
-            let readrange = load(self.p[col])..load(self.p[col + 1]);
-            self.p[col] = store(writeidx);
+            let readrange = self.p.get(col)..self.p.get(col + 1);
+            self.p.set(col, writeidx);
 
             for readidx in readrange {
-                let i = load(self.i[readidx]);
-                let is_duplicate = load(last_seen_at[i]) > load(self.p[col]);
+                let i = self.i.get(readidx);
+                let is_duplicate = last_seen_at.get(i) > self.p.get(col);
                 if is_duplicate {
-                    let to_add_to = load(last_seen_at[i]) - 1;
+                    let to_add_to = last_seen_at.get(i) - 1;
                     self.x[to_add_to] = reduce(self.x[to_add_to].clone(), self.x[readidx].clone());
                 } else {
-                    self.i[writeidx] = self.i[readidx];
+                    self.i.set(writeidx, self.i.get(readidx));
                     self.x[writeidx] = self.x[readidx].clone();
                     writeidx += 1;
-                    last_seen_at[i] = store(writeidx);
+                    last_seen_at.set(i, writeidx);
                 }
             }
         }
         let last = self.p.len() - 1;
-        self.p[last] = store(writeidx);
-        self.i.truncate(writeidx);
+        self.p.set(last, writeidx);
+        self.i.values.truncate(writeidx);
         self.x.truncate(writeidx);
         self
     }
@@ -163,11 +140,11 @@ where
         let mut j = Vec::<SizeT>::with_capacity(self.i.len());
         for k in 0..self.p.len() - 1 {
             j.extend(
-                std::iter::repeat::<SizeT>(store(k)).take(load(self.p[k + 1]) - load(self.p[k])),
+                std::iter::repeat(IdxStorage::<SizeT>::to_contained(k)).take(self.p.get(k + 1) - self.p.get(k)),
             )
         }
         CoordsMatrix {
-            i: self.i,
+            i: self.i.values,
             j,
             x: self.x,
         }
@@ -181,8 +158,8 @@ where
 
         let mut dense = vec![ScalarT::default(); m * n];
         for j in 0..self.p.len() - 1 {
-            for k in load(self.p[j])..load(self.p[j + 1]) {
-                let i = load(self.i[k]);
+            for k in self.p.get(j)..self.p.get(j + 1) {
+                let i = self.i.get(k);
                 dense[index(m, n, i, j)] = self.x[k].clone();
             }
         }
