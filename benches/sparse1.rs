@@ -17,12 +17,12 @@ fn make_random(m: u32, n: u32, k: u32) -> CoordsMatrix<f32, u32> {
 }
 
 pub fn sparse_create(c: &mut Criterion) {
-    let m = 1000;
-    let n = 1000;
-    let k = 3000;
+    let m = 10000;
+    let n = 10000;
+    let k = 100*n;
     let coo = make_random(m, n, k);
 
-    c.bench_function("make 1000x1000-3000", |b| {
+    c.bench_function("make matrix : (m * n : k) = (1e4 * 1e4 : 1e6)", |b| {
         b.iter(|| {
             SMatrix::from_coords_dedup_accumulate(
                 black_box((m as usize, n as usize)),
