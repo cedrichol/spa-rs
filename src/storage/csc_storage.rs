@@ -21,31 +21,16 @@ pub struct CoordsMatrix<Scalar, Size = usize> {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct SLaneView<'a, Scalar: ScalarT, Size: SizeT> {
-    pub(crate) m: usize,
-    pub(crate) i: IdxStorage<&'a [Size]>,
-    pub(crate) x: &'a [Scalar],
+pub struct SLaneAccessor<'a, Scalar: ScalarT, Size: SizeT> {
+    pub matrix: &'a SMatrix<Scalar, Size>,
+    pub j: usize,
 }
 
-impl<'a, Scalar: ScalarT, Size: SizeT> SLaneView<'a, Scalar, Size> {
-    pub fn from_raw(m: usize, i: &'a [Size], x: &'a [Scalar]) -> Self {
-        Self {
-            m,
-            i: IdxStorage::from(i),
-            x,
-        }
+impl<'a, Scalar: ScalarT, Size: SizeT> SLaneAccessor<'a, Scalar, Size> {
+    pub fn from_matrix_lane(matrix: &'a SMatrix<Scalar, Size>, j: usize) -> Self {
+        Self { matrix, j }
     }
-    pub fn from_matrix_lane(a: &'a SMatrix<Scalar, Size>, j: usize) -> Self {
-        let range = a.p.get(j)..a.p.get(j + 1);
-        let i = IdxStorage::from(&a.i.values[range.clone()]);
-        let x = &a.x[range];
-        Self {
-            m: a.get_shape().0,
-            i,
-            x,
-        }
-    }
-    pub fn get_shape(&self) -> usize {
-        self.m
+    pub fn value_range(&self) -> std::ops::Range<usize> {
+        self.matrix.p.get(self.j)..self.matrix.p.get(self.j + 1)
     }
 }

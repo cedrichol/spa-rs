@@ -46,7 +46,6 @@ where
     }
 }
 
-
 fn load<SizeT>(x: SizeT) -> usize
 where
     SizeT: TryFrom<usize> + TryInto<usize>,

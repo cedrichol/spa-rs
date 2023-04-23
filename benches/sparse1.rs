@@ -19,7 +19,7 @@ fn make_random(m: u32, n: u32, k: u32) -> CoordsMatrix<f32, u32> {
 pub fn sparse_create(c: &mut Criterion) {
     let m = 10000;
     let n = 10000;
-    let k = 100*n;
+    let k = 100 * n;
     let coo = make_random(m, n, k);
 
     c.bench_function("make matrix : (m * n : k) = (1e4 * 1e4 : 1e6)", |b| {
